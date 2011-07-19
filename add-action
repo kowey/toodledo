@@ -1,0 +1,48 @@
+#!/bin/bash
+SCRIPT_DIR=$HOME/PROJECTS/toodledo
+EMAIL=$(cat $HOME/.toodledouser)
+PW=$(cat $HOME/.toodledopw)
+
+TOODLEDOQ=${HOME}/.toodledoq
+mkdir -p $TOODLEDOQ
+TMPDIR=$(mktemp -d -t toodleenq)
+cat > $TMPDIR/raw
+formail -X "Message-Id" -X "Message-ID" -X "From:" -X "Date" < $TMPDIR/raw > $TMPDIR/headers
+MSGID=$(formail -X "Message-Id" -X "Message-ID" < $TMPDIR/raw | head | sed -e 's/^.*: //')
+ripmime -i $TMPDIR/raw -d $TMPDIR -v --verbose-contenttype > $TMPDIR/log
+touch $TMPDIR/body
+for t in $(grep "text/plain" $TMPDIR/log | sed -e 's/.*filename=//'); do
+    file $TMPDIR/$t | grep "8859" -q
+    STATUS=$?
+    if [ $STATUS -eq 0 ]; then
+        iconv -f iso-8859-15 -t utf-8 $TMPDIR/$t >> $TMPDIR/body
+    else
+        cat $TMPDIR/$t >> $TMPDIR/body
+    fi
+done
+
+DATE=$(date +"%Y-%m-%d.%H%m")
+ENTRY=$(mktemp $TOODLEDOQ/$DATE.XXXX)
+echo "$@" :"$MSGID" > $ENTRY
+cat $TMPDIR/headers >> $ENTRY
+echo >> $ENTRY
+cat $TMPDIR/body    >> $ENTRY
+rm -rf $TMPDIR
+
+# ----------------------------------------------------------------------
+# empty the queue
+# ----------------------------------------------------------------------
+
+LIBDIR=${SCRIPT_DIR}/lib
+CLASSPATH=${SCRIPT_DIR}:\
+$LIBDIR/commons-codec-1.2.jar:\
+$LIBDIR/commons-httpclient-3.1.jar:\
+$LIBDIR/commons-logging-1.0.4.jar:\
+$LIBDIR/joda-time-1.6-javadoc.jar:\
+$LIBDIR/joda-time-1.6-sources.jar:\
+$LIBDIR/joda-time-1.6.jar:\
+$LIBDIR/toodledo-java.jar:\
+$LIBDIR/scalaj-collection_2.8.0-1.0.jar
+
+# empty the queue
+scala -classpath $CLASSPATH toodledoMua $EMAIL $PW

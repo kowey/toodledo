@@ -1,0 +1,13 @@
+#!/bin/bash
+TMPDIR=$(mktemp -d -t "ripmime-XXXX")
+ripmime -i - -d $TMPDIR -v --verbose-contenttype > $TMPDIR/log
+for t in $(grep "text/plain" $TMPDIR/log | sed -e 's/.*filename=//'); do
+    file $TMPDIR/$t | grep "8859" -q
+    STATUS=$?
+    if [ $STATUS -eq 0 ]; then
+        iconv -f iso-8859-15 -t utf-8 $TMPDIR/$t
+    else
+        cat $TMPDIR/$t
+    fi
+done
+rm -rf $TMPDIR
